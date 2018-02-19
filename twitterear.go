@@ -90,8 +90,8 @@ func main() {
 	tweets := GetTweetsFromSearchApi(twClient)
 
 	for _, tweet := range tweets {
-		fmt.Print("FULLTEXT:", tweet.FullText)
-		fmt.Print("CLEAN TEXT:", CleanText(tweet.FullText))
+		fmt.Print("FULL TEXT: ", tweet.FullText)
+		fmt.Print("CLEAN TEXT: ", CleanText(tweet.FullText))
 
 		break
 
