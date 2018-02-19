@@ -15,6 +15,7 @@ import (
 	"github.com/dghubble/oauth1"
 	"github.com/joho/godotenv"
 	"github.com/thebigear/database"
+	"github.com/thebigear/models"
 	"github.com/thebigear/utils"
 	"github.com/tuvistavie/structomap"
 	"mvdan.cc/xurls"
@@ -85,7 +86,7 @@ func CleanText(text string) string {
 
 func main() {
 	twClient := initTwitterConnection()
-	//rekogClient, _ := initRekognitionConnection()
+	rekogClient, _ := initRekognitionConnection()
 
 	tweets := GetTweetsFromSearchApi(twClient)
 
@@ -93,10 +94,60 @@ func main() {
 		fmt.Print("FULL TEXT: ", tweet.FullText)
 		fmt.Print("CLEAN TEXT: ", CleanText(tweet.FullText))
 
-		break
+		expression := &models.Expression{}
+		expression.Owner = tweet.User.IDStr
+		expression.FullText = tweet.FullText
+		expression.CleanText = CleanText(tweet.FullText)
+		expression.IsVerified = tweet.User.Verified
+		expression.HasAttachment = HasAttachment(tweet)
+		expression.Followers = tweet.User.FollowersCount
+		expression.Following = tweet.User.FriendsCount
+		expression.PostCount = tweet.User.StatusesCount
+
+		userTweets := GetUserTweetsFromTimeline(twClient, tweet.User.ID)
+		totalLikes := 0
+		totalRetweets := 0
+		for _, userTweet := range userTweets {
+			totalLikes += userTweet.FavoriteCount
+			totalRetweets += userTweet.RetweetCount
+		}
+
+		expression.LastTenInteraction = totalLikes + totalRetweets
+		expression.TotalInteraction = tweet.FavoriteCount + tweet.RetweetCount
+
+		photoAttached, mediaIndex := IsAnyAttachmentPhoto(tweet)
+		if photoAttached == true {
+
+			expression.MediaURL = tweet.Entities.Media[mediaIndex].MediaURL
+
+			imagebytes := DownloadImage(tweet.Entities.Media[mediaIndex].MediaURL)
+			labels, _ := detectLabels(rekogClient, imagebytes)
+
+			expression.AttachmentLabels = labels
+
+		}
+
+		expression.Create()
 
 	}
 
+}
+
+func GetUserTweetsFromTimeline(client *twitter.Client, userID int64) []twitter.Tweet {
+
+	er := true
+	ir := false
+
+	params := &twitter.UserTimelineParams{
+		Count:           10,
+		ExcludeReplies:  &er,
+		IncludeRetweets: &ir,
+		UserID:          userID,
+	}
+
+	timeline, _, _ := client.Timelines.UserTimeline(params)
+
+	return timeline
 }
 
 func GetTweetsFromSearchApi(client *twitter.Client) []twitter.Tweet {
@@ -125,6 +176,10 @@ func HasAttachment(tweet twitter.Tweet) bool {
 }
 
 func IsAnyAttachmentPhoto(tweet twitter.Tweet) (bool, int) {
+
+	if HasAttachment(tweet) == false {
+		return false, 99
+	}
 
 	for index, media := range tweet.Entities.Media {
 		if media.Type == "photo" {
@@ -160,10 +215,12 @@ func DownloadImage(url string) []byte {
 
 func detectLabels(svc *rekognition.Rekognition, data []byte) (string, error) {
 
+	mc := float64(60)
 	params := &rekognition.DetectLabelsInput{
 		Image: &rekognition.Image{ // Required
 			Bytes: data,
 		},
+		MinConfidence: &mc,
 	}
 
 	result, err := svc.DetectLabels(params)
