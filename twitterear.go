@@ -238,11 +238,11 @@ func GetTweetsFromSearchApi(client *twitter.Client) []twitter.Tweet {
 	ie := true
 	count := 100
 	params := &twitter.SearchTweetParams{
-		Query:           "sports AND -filter:retweets AND -filter:replies",
+		Query:           "news AND -filter:retweets AND -filter:replies",
 		Lang:            "en",
 		IncludeEntities: &ie,
 		TweetMode:       "extended",
-		ResultType:      "mixed",
+		ResultType:      "popular",
 		Count:           count,
 		Until:           formatted_time,
 	}
