@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -63,8 +64,8 @@ func initTwitterConnection() *twitter.Client {
 
 }
 
-func CleanText(text string) string {
-
+func CleanTweet(tweet twitter.Tweet) string {
+	text := tweet.FullText
 	url := xurls.Relaxed().FindAllString(text, -1)
 
 	if len(url) > 0 {
@@ -73,9 +74,59 @@ func CleanText(text string) string {
 			text = strings.Replace(text, element, "", -1)
 		}
 	}
+	if tweet.ExtendedTweet != nil && tweet.ExtendedTweet.Entities != nil {
+
+		hashtags := tweet.ExtendedTweet.Entities.Hashtags
+		mentions := tweet.ExtendedTweet.Entities.UserMentions
+		medias := tweet.ExtendedTweet.Entities.Media
+		urls := tweet.ExtendedTweet.Entities.Urls
+
+		if len(hashtags) > 0 {
+
+			for _, element := range hashtags {
+
+				text = strings.Replace(text, element.Text, "", -1)
+
+			}
+
+		}
+		if len(mentions) > 0 {
+
+			for _, element := range mentions {
+
+				text = strings.Replace(text, element.Name, "", -1)
+
+			}
+
+		}
+		if len(medias) > 0 {
+
+			for _, element := range medias {
+
+				text = strings.Replace(text, element.MediaURL, "", -1)
+
+			}
+
+		}
+		if len(urls) > 0 {
+
+			for _, element := range urls {
+
+				text = strings.Replace(text, element.URL, "", -1)
+
+			}
+
+		}
+	}
+
+	text = strings.Replace(text, "_", " ", -1)
+	text = strings.Replace(text, "#", "", -1)
+	text = strings.Replace(text, "@", "", -1)
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
 
 	// Make a Regex to say we only want
-	reg, err := regexp.Compile("[^a-zA-Z0-9 -]+ ")
+	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+ ")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,15 +155,16 @@ func main() {
 
 		duplicate, _ := models.GetExpression(query)
 
-		cleanText := CleanText(tweet.FullText)
+		cleanText := CleanTweet(tweet)
 
 		if duplicate == nil && cleanText != "" {
 
-			fmt.Print("CLEAN TEXT: ", cleanText)
+			fmt.Print("\nCLEAN TEXT: ", cleanText)
 			isVerified := tweet.User.Verified
 			hasAtatchments := HasAttachment(tweet)
 			followerCount := tweet.User.FollowersCount
 			followingCount := tweet.User.FriendsCount
+			postsCount := tweet.User.StatusesCount
 
 			expression := &models.Expression{}
 			expression.PostID = tweet.ID
@@ -123,7 +175,7 @@ func main() {
 			expression.HasAttachment = &hasAtatchments
 			expression.Followers = &followerCount
 			expression.Following = &followingCount
-			expression.PostCount = tweet.User.StatusesCount
+			expression.PostCount = &postsCount
 
 			userTweets := GetUserTweetsFromTimeline(twClient, tweet.User.ID)
 			totalLikes := 0
@@ -145,12 +197,12 @@ func main() {
 				expression.MediaURL = tweet.Entities.Media[mediaIndex].MediaURL
 
 				imagebytes := DownloadImage(tweet.Entities.Media[mediaIndex].MediaURL)
-				labels, _ := detectLabels(rekogClient, imagebytes)
+				labels, err := detectLabels(rekogClient, imagebytes)
 
-				expression.AttachmentLabels = labels
+				if err == nil {
+					expression.AttachmentLabels = &labels
+				}
 
-			} else {
-				expression.AttachmentLabels = "nil"
 			}
 
 			expression.Create()
@@ -190,7 +242,7 @@ func GetTweetsFromSearchApi(client *twitter.Client) []twitter.Tweet {
 		Lang:            "en",
 		IncludeEntities: &ie,
 		TweetMode:       "extended",
-		ResultType:      "popular",
+		ResultType:      "mixed",
 		Count:           count,
 		Until:           formatted_time,
 	}
@@ -284,7 +336,7 @@ func detectLabels(svc *rekognition.Rekognition, data []byte) (string, error) {
 			// Message from an error.
 			fmt.Println(err.Error())
 		}
-		return "nil", err
+		return "", err
 	}
 	var s []string
 
@@ -296,8 +348,10 @@ func detectLabels(svc *rekognition.Rekognition, data []byte) (string, error) {
 
 		}
 
+		return strings.Join(s, " "), nil
+
 	}
 
-	return strings.Join(s, " "), nil
+	return "", errors.New("No Match")
 
 }

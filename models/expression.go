@@ -22,11 +22,11 @@ type Expression struct {
 	IsVerified         *bool         `json:"is_verified,omitempty" bson:"is_verified,omitempty"`
 	HasAttachment      *bool         `json:"has_attachment,omitempty" bson:"has_attachment,omitempty"`
 	Owner              string        `json:"owner,omitempty" bson:"owner,omitempty"`
-	AttachmentLabels   string        `json:"attachment_labels,omitempty" bson:"attachment_labels,omitempty"`
+	AttachmentLabels   *string       `json:"attachment_labels,omitempty" bson:"attachment_labels,omitempty"`
 	MediaURL           string        `json:"media_url,omitempty" bson:"media_url,omitempty"`
 	Followers          *int          `json:"followers,omitempty" bson:"followers,omitempty"`
 	Following          *int          `json:"following,omitempty" bson:"following,omitempty"`
-	PostCount          int           `json:"post_count,omitempty" bson:"post_count,omitempty"`
+	PostCount          *int          `json:"post_count,omitempty" bson:"post_count,omitempty"`
 	LastTenInteraction *int          `json:"last_ten_interaction,omitempty" bson:"last_ten_interaction,omitempty"`
 	TotalInteraction   *int          `json:"total_interaction,omitempty" bson:"total_interaction,omitempty"`
 	//Analysis  Analysis      `json:"analysis,omitempty" bson:"analysis,omitempty"`
