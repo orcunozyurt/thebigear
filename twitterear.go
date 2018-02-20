@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -80,6 +81,12 @@ func CleanText(text string) string {
 	}
 	text = reg.ReplaceAllString(text, " ")
 
+	whitespacedeletereg, err := regexp.Compile("[ ]{2,}")
+	if err != nil {
+		log.Fatal(err)
+	}
+	text = whitespacedeletereg.ReplaceAllString(text, " ")
+
 	return text
 
 }
@@ -91,43 +98,63 @@ func main() {
 	tweets := GetTweetsFromSearchApi(twClient)
 
 	for _, tweet := range tweets {
-		fmt.Print("FULL TEXT: ", tweet.FullText)
-		fmt.Print("CLEAN TEXT: ", CleanText(tweet.FullText))
 
-		expression := &models.Expression{}
-		expression.Owner = tweet.User.IDStr
-		expression.FullText = tweet.FullText
-		expression.CleanText = CleanText(tweet.FullText)
-		expression.IsVerified = tweet.User.Verified
-		expression.HasAttachment = HasAttachment(tweet)
-		expression.Followers = tweet.User.FollowersCount
-		expression.Following = tweet.User.FriendsCount
-		expression.PostCount = tweet.User.StatusesCount
+		query := database.Query{}
+		query["post_id"] = tweet.ID
 
-		userTweets := GetUserTweetsFromTimeline(twClient, tweet.User.ID)
-		totalLikes := 0
-		totalRetweets := 0
-		for _, userTweet := range userTweets {
-			totalLikes += userTweet.FavoriteCount
-			totalRetweets += userTweet.RetweetCount
+		duplicate, _ := models.GetExpression(query)
+
+		cleanText := CleanText(tweet.FullText)
+
+		if duplicate == nil && cleanText != "" {
+
+			fmt.Print("CLEAN TEXT: ", cleanText)
+			isVerified := tweet.User.Verified
+			hasAtatchments := HasAttachment(tweet)
+			followerCount := tweet.User.FollowersCount
+			followingCount := tweet.User.FriendsCount
+
+			expression := &models.Expression{}
+			expression.PostID = tweet.ID
+			expression.Owner = tweet.User.IDStr
+			expression.FullText = tweet.FullText
+			expression.CleanText = cleanText
+			expression.IsVerified = &isVerified
+			expression.HasAttachment = &hasAtatchments
+			expression.Followers = &followerCount
+			expression.Following = &followingCount
+			expression.PostCount = tweet.User.StatusesCount
+
+			userTweets := GetUserTweetsFromTimeline(twClient, tweet.User.ID)
+			totalLikes := 0
+			totalRetweets := 0
+			for _, userTweet := range userTweets {
+				totalLikes += userTweet.FavoriteCount
+				totalRetweets += userTweet.RetweetCount
+			}
+
+			lasttentotal := totalLikes + totalRetweets
+			total := tweet.FavoriteCount + tweet.RetweetCount
+
+			expression.LastTenInteraction = &lasttentotal
+			expression.TotalInteraction = &total
+
+			photoAttached, mediaIndex := IsAnyAttachmentPhoto(tweet)
+			if photoAttached == true {
+
+				expression.MediaURL = tweet.Entities.Media[mediaIndex].MediaURL
+
+				imagebytes := DownloadImage(tweet.Entities.Media[mediaIndex].MediaURL)
+				labels, _ := detectLabels(rekogClient, imagebytes)
+
+				expression.AttachmentLabels = labels
+
+			} else {
+				expression.AttachmentLabels = "nil"
+			}
+
+			expression.Create()
 		}
-
-		expression.LastTenInteraction = totalLikes + totalRetweets
-		expression.TotalInteraction = tweet.FavoriteCount + tweet.RetweetCount
-
-		photoAttached, mediaIndex := IsAnyAttachmentPhoto(tweet)
-		if photoAttached == true {
-
-			expression.MediaURL = tweet.Entities.Media[mediaIndex].MediaURL
-
-			imagebytes := DownloadImage(tweet.Entities.Media[mediaIndex].MediaURL)
-			labels, _ := detectLabels(rekogClient, imagebytes)
-
-			expression.AttachmentLabels = labels
-
-		}
-
-		expression.Create()
 
 	}
 
@@ -152,14 +179,20 @@ func GetUserTweetsFromTimeline(client *twitter.Client, userID int64) []twitter.T
 
 func GetTweetsFromSearchApi(client *twitter.Client) []twitter.Tweet {
 
+	// at least 2 days old tweets
+	current_time := time.Now().AddDate(0, 0, -2)
+	formatted_time := current_time.Format("2006-01-02")
+
 	ie := true
+	count := 100
 	params := &twitter.SearchTweetParams{
-		Query:           "technology AND -filter:retweets AND -filter:replies",
+		Query:           "sports AND -filter:retweets AND -filter:replies",
 		Lang:            "en",
 		IncludeEntities: &ie,
 		TweetMode:       "extended",
 		ResultType:      "popular",
-		Count:           50,
+		Count:           count,
+		Until:           formatted_time,
 	}
 
 	//Search Tweets
