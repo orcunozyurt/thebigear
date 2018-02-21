@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -143,10 +144,20 @@ func CleanTweet(tweet twitter.Tweet) string {
 }
 
 func main() {
+	key := flag.String("key", "foo", "search key")
+	count := flag.Int("count", 100, "Tweet results per page")
+	popular := flag.Bool("popular", false, "Want Popular Results")
+
+	flag.Parse()
+
+	fmt.Println("key:", *key)
+	fmt.Println("count:", *count)
+	fmt.Println("popular:", *popular)
+
 	twClient := initTwitterConnection()
 	rekogClient, _ := initRekognitionConnection()
 
-	tweets := GetTweetsFromSearchApi(twClient)
+	tweets := GetTweetsFromSearchApi(twClient, key, count, popular)
 
 	for _, tweet := range tweets {
 
@@ -229,21 +240,31 @@ func GetUserTweetsFromTimeline(client *twitter.Client, userID int64) []twitter.T
 	return timeline
 }
 
-func GetTweetsFromSearchApi(client *twitter.Client) []twitter.Tweet {
+func GetTweetsFromSearchApi(client *twitter.Client, key *string, count *int, popular *bool) []twitter.Tweet {
 
 	// at least 2 days old tweets
 	current_time := time.Now().AddDate(0, 0, -2)
 	formatted_time := current_time.Format("2006-01-02")
 
 	ie := true
-	count := 100
+	rpp := count
+	var res_type string
+	query := fmt.Sprintf("%s AND -filter:retweets AND -filter:replies", *key)
+
+	fmt.Println(query)
+
+	if *popular {
+		res_type = "popular"
+	} else {
+		res_type = "mixed"
+	}
 	params := &twitter.SearchTweetParams{
-		Query:           "news AND -filter:retweets AND -filter:replies",
+		Query:           query,
 		Lang:            "en",
 		IncludeEntities: &ie,
 		TweetMode:       "extended",
-		ResultType:      "popular",
-		Count:           count,
+		ResultType:      res_type,
+		Count:           *rpp,
 		Until:           formatted_time,
 	}
 
