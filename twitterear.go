@@ -165,10 +165,10 @@ func main() {
 		query["post_id"] = tweet.ID
 
 		duplicate, _ := models.GetExpression(query)
-
+		totalInteraction := tweet.FavoriteCount + tweet.RetweetCount
 		cleanText := CleanTweet(tweet)
 
-		if duplicate == nil && cleanText != "" {
+		if duplicate == nil && cleanText != "" && totalInteraction > 1 {
 
 			fmt.Print("\nCLEAN TEXT: ", cleanText)
 			isVerified := tweet.User.Verified
@@ -197,10 +197,9 @@ func main() {
 			}
 
 			lasttentotal := totalLikes + totalRetweets
-			total := tweet.FavoriteCount + tweet.RetweetCount
 
 			expression.LastTenInteraction = &lasttentotal
-			expression.TotalInteraction = &total
+			expression.TotalInteraction = &totalInteraction
 
 			photoAttached, mediaIndex := IsAnyAttachmentPhoto(tweet)
 			if photoAttached == true {
