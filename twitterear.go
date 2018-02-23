@@ -248,7 +248,7 @@ func GetTweetsFromSearchApi(client *twitter.Client, key *string, count *int, pop
 	ie := true
 	rpp := count
 	var res_type string
-	query := fmt.Sprintf("%s AND -filter:retweets AND -filter:replies", *key)
+	query := fmt.Sprintf("%s AND -filter:retweets AND -filter:replies AND min_faves:3", *key)
 
 	fmt.Println(query)
 

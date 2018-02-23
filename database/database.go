@@ -71,7 +71,7 @@ func NewPaginationParams() *PaginationParams {
 func PaginationParamsForContext(pageQuery, limitQuery, sortByQuery string) *PaginationParams {
 	limit, limitErr := strconv.Atoi(limitQuery)
 	if limitErr != nil {
-		limit = 50
+		limit = 7500
 	}
 
 	sortBy := "-_id"
