@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"regexp"
 
 	"github.com/joho/godotenv"
 	"github.com/thebigear/database"
@@ -32,6 +33,20 @@ func main() {
 
 	expressions, _ = models.ListExpressions(query, paginationParams)
 
-	fmt.Println("TOTAL OF:", len(*expressions))
+	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, tweet := range *expressions {
+
+		fmt.Println("OLD: ", tweet.CleanText)
+		processedString := reg.ReplaceAllString(tweet.CleanText, "")
+		tweet.CleanText = processedString
+
+		fmt.Println("NEW: ", processedString)
+		tweet.Update()
+
+	}
 
 }
