@@ -40,12 +40,21 @@ func main() {
 
 	for _, tweet := range *expressions {
 
-		fmt.Println("OLD: ", tweet.CleanText)
-		processedString := reg.ReplaceAllString(tweet.CleanText, "")
-		tweet.CleanText = processedString
+		tot_interaction := tweet.TotalInteraction
 
-		fmt.Println("NEW: ", processedString)
-		tweet.Update()
+		if *tot_interaction > 5000 {
+			tweet.Delete()
+			fmt.Println("DELETED")
+		} else {
+
+			fmt.Println("OLD: ", tweet.CleanText)
+			processedString := reg.ReplaceAllString(tweet.CleanText, "")
+			tweet.CleanText = processedString
+
+			fmt.Println("NEW: ", processedString)
+			tweet.Update()
+
+		}
 
 	}
 
